@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-    provider = "sqlite"
+    provider = "postgresql"
     // NOTE: When using postgresql, mysql or sqlserver, uncomment the @db.Text annotations in model Account below
     // Further reading:
     // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
@@ -47,6 +47,11 @@ model Session {
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum Theme {
+    light
+    dark
+}
+
 model User {
     id            String    @id @default(cuid())
     name          String?
@@ -55,6 +60,11 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
+    username     String?   
+    theme       Theme @default(light)
+
+    messages Message[]
+    conversations ConversationUser[]
 }
 
 model VerificationToken {
@@ -63,4 +73,43 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+model Conversations {
+    id        String   @id @default(cuid())
+    lastMessageId String? @unique
+    createdAt DateTime @default(now()) @db.Timestamptz()
+
+    messages Message[]
+    lastMessage Message? @relation("lastMessage", fields: [lastMessageId], references: [id])
+    conversationUsers ConversationUser[]
+
+    @@index([lastMessageId])
+}
+
+model Message {
+    id        String   @id @default(cuid())
+    messageText String
+    userId String
+    conversationId String
+    createdAt DateTime @default(now()) @db.Timestamptz()
+
+    user User @relation(fields: [userId], references: [id])
+    conversation Conversations @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    lastMessageOfConversation Conversations? @relation("lastMessage")
+
+    @@index([conversationId])
+}
+
+model ConversationUser {
+    userId String
+    conversationId String
+    createdAt DateTime @default(now()) @db.Timestamptz()
+
+    @@unique([userId, conversationId])
+
+    user User @relation(fields: [userId], references: [id])
+    conversation Conversations @relation(fields: [conversationId], references: [id], onDelete: Cascade) 
+
+    @@index([conversationId])
 }
