@@ -1,13 +1,73 @@
 import { type NextPage } from "next";
+import { useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 import { api } from "~/utils/api";
 import Navbar from "~/components/Navbar/Navbar";
+import useOnChange from "~/hooks/useOnChange";
+import Image from "next/image";
+
+interface InputWLabels {
+  value: string;
+  name: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+const InputWithLabels = ({
+  value,
+  name,
+  onChange,
+}: InputWLabels): JSX.Element => {
+  return (
+    <div className="flex flex-col space-y-2">
+      <label htmlFor={name}>change {name}</label>
+      <input
+        type="text"
+        name={name}
+        id={name}
+        value={value}
+        placeholder={name}
+        className="h-10 w-full rounded-lg bg-level2 px-3 py-2 outline-none placeholder:text-quaternaryText"
+        onChange={onChange}
+      />
+    </div>
+  );
+};
 
 const Home: NextPage = () => {
-  const hello = api.example.hello.useQuery({ text: "from tRPC" });
+  const {
+    values: { name, username, image },
+    setValues,
+    handleChange,
+  } = useOnChange({
+    name: "",
+    username: "",
+    image: "",
+  });
+
+  const changeUserDataMutation = api.user.changeUserData.useMutation();
+  const { data: sessionData } = useSession();
+
+  const changeUserData = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    changeUserDataMutation.mutate({
+      name: name || undefined,
+      username: username || undefined,
+      image: image || undefined,
+    });
+  };
+
+  useEffect(() => {
+    if (sessionData?.user) {
+      setValues({
+        name: sessionData.user?.name || "",
+        username: sessionData.user?.username || "",
+        image: sessionData.user?.image || "",
+      });
+    }
+  }, [sessionData]);
 
   return (
     <>
@@ -19,7 +79,41 @@ const Home: NextPage = () => {
       <Navbar />
       <main className="flex min-h-screen flex-col items-center justify-center">
         <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16 ">
-          {hello.data ? hello.data.greeting : "Loading tRPC query..."}
+          <form
+            className="flex flex-col space-y-5 rounded-xl bg-level1 p-8 shadow-sm"
+            onSubmit={changeUserData}
+          >
+            {sessionData?.user?.image && (
+              <Image
+                src={sessionData?.user?.image}
+                alt="user image"
+                className="mx-auto h-11 w-11 rounded-full"
+                width={64}
+                height={64}
+              />
+            )}
+            <InputWithLabels
+              name="name"
+              value={name!}
+              onChange={handleChange}
+            />
+            <InputWithLabels
+              name="username"
+              value={username!}
+              onChange={handleChange}
+            />
+            <InputWithLabels
+              name="image"
+              value={image!}
+              onChange={handleChange}
+            />
+            <button
+              className="h-9 w-full rounded-lg bg-primaryText text-invertedPrimaryText"
+              type="submit"
+            >
+              Submit
+            </button>
+          </form>
           <AuthShowcase />
         </div>
       </main>
@@ -32,16 +126,10 @@ export default Home;
 const AuthShowcase: React.FC = () => {
   const { data: sessionData } = useSession();
 
-  const { data: secretMessage } = api.example.getSecretMessage.useQuery(
-    undefined, // no input
-    { enabled: sessionData?.user !== undefined }
-  );
-
   return (
     <div className="flex flex-col items-center justify-center gap-4">
       <p className="text-center text-2xl">
         {sessionData && <span>Logged in as {sessionData.user?.name}</span>}
-        {secretMessage && <span> - {secretMessage}</span>}
       </p>
       <button
         className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
